@@ -2,6 +2,8 @@
 
 I'm interested in scraping all of the companies listed in the "Made in New York" directory now called `digital.nyc` located here [http://www.digital.nyc/startups](http://www.digital.nyc/startups).
 
+CSV of Companies can be found here https://github.com/reggi/digital.nyc-companies.
+
 What I really want to find is a list of companies based in New York using the Shopify e-commerce platform. To achieve this there needs to be a couple of difference steps.
 
 I need to get all of the startups listed into a database. Each startup has a `name` and a `profile` on the `digital.nyc` website. With the full list of profile pages I can scrape the page and look for the companies `website`.
