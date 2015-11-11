@@ -8,11 +8,14 @@ import redis from 'redis'
 import PouchDB from 'pouchdb'
 import csv from 'csv'
 import fs from 'fs'
-import { range, slice, clone, merge } from 'lodash'
+import { range, clone, merge } from 'lodash'
 Promise.promisifyAll(redis.RedisClient.prototype)
 Promise.promisifyAll(redis.Multi.prototype)
 Promise.promisifyAll(csv)
 Promise.promisifyAll(fs)
+
+// (pouch's design doc)
+/* global emit */
 
 const POUCH_URI = 'http://127.0.0.1:5984/companies'
 const DIGITAL_NYC_URI = 'http://www.digital.nyc'
@@ -28,20 +31,20 @@ let numberOfPages = (numberOfCompanies) => Math.floor(numberOfCompanies / 20)
 let debounceRequest = promiseDebounce(request.get, 1000, 75).bind(request)
 let debouncePut = promiseDebounce(pouchClient.put, 1000, 100).bind(pouchClient)
 
-function updateDoc(doc, add) {
+function updateDoc (doc, add) {
   let _doc = clone(doc)
   delete _doc._rev
   delete _doc._id
   return merge(_doc, add)
 }
 
-function putWrapper(row, add) {
+function putWrapper (row, add) {
   let update = updateDoc(row.doc, add)
   return debouncePut(update, row.doc._id, row.doc._rev)
 }
 
 /* cached requests */
-async function cacheRequest(options){
+async function cacheRequest (options) {
   let HTML
   let stringOptions = JSON.stringify(options)
   let optionsHashed = createHash(stringOptions)
@@ -74,7 +77,7 @@ async function numberOfCompanies () {
 function getCompaniesOnPage (pageHTML) {
   let $ = cheerio.load(pageHTML)
   let companySelector = 'h3.node-title a'
-  let companies = $(companySelector).map(function(i, el) {
+  let companies = $(companySelector).map(function (i, el) {
     let name = $(this).text()
     let profile = $(this).attr('href')
     return {
@@ -90,7 +93,7 @@ async function insertCompaniesOnPage (page) {
   let pageURI = getPageURI(page)
   let pageHTML = await cacheRequest(pageURI)
   let pageCompanies = getCompaniesOnPage(pageHTML)
-  let insert = await pouchClient.bulkDocs(pageCompanies)
+  await pouchClient.bulkDocs(pageCompanies)
   return pageCompanies
 }
 /* scan pages (get name, profile)*/
@@ -119,24 +122,24 @@ async function insertCompanyWebsite (company) {
   return await putWrapper(company, { website })
 }
 
-function promiseDebounce(fn, delay, count) {
-  var working = 0, queue = [];
-  function work() {
-    if ((queue.length === 0) || (working === count)) return;
-    working++;
-    Promise.delay(delay).tap(function () { working--; }).then(work);
-    var next = queue.shift();
-    next[2](fn.apply(next[0], next[1]));
+function promiseDebounce (fn, delay, count) {
+  var working = 0
+  var queue = []
+  function work () {
+    if ((queue.length === 0) || (working === count)) return
+    working++
+    Promise.delay(delay).tap(function () { working-- }).then(work)
+    var next = queue.shift()
+    next[2](fn.apply(next[0], next[1]))
   }
-  return function debounced() {
-    var args = arguments;
-    return new Promise(function(resolve){
-      queue.push([this, args, resolve]);
-      if (working < count) work();
-    }.bind(this));
+  return function debounced () {
+    var args = arguments
+    return new Promise(function (resolve) {
+      queue.push([this, args, resolve])
+      if (working < count) work()
+    }.bind(this))
   }
 }
-
 
 function getUsesShopify (websiteHTML) {
   if (!websiteHTML) return null
@@ -173,7 +176,7 @@ async function insertUsesShopify (company) {
 /* scan profiles (get website) */
 async function scanProfiles () {
   let companies = await pouchClient.allDocs({
-    include_docs: true,
+    include_docs: true
   })
   // let use = slice(companies.rows, 100, 200)
   let use = companies.rows
@@ -183,14 +186,14 @@ async function scanProfiles () {
 /* scan websites (get shopify) */
 async function scanWebsites () {
   let companies = await pouchClient.allDocs({
-    include_docs: true,
+    include_docs: true
   })
   // let use = slice(companies.rows, 0, 300)
   let use = companies.rows
   return Promise.map(use, company => insertUsesShopify(company))
 }
 
-async function ensureDesign(doc) {
+async function ensureDesign (doc) {
   let exists = await pouchClient.get(doc._id)
   if (exists) return exists
   await pouchClient.put(doc)
@@ -198,11 +201,11 @@ async function ensureDesign(doc) {
 }
 
 const shopifyDesignDoc = {
-  "_id": "_design/shopify",
-  "language": "javascript",
-  "views": {
-    "shopify": {
-      "map": function (doc) {
+  '_id': '_design/shopify',
+  'language': 'javascript',
+  'views': {
+    'shopify': {
+      'map': function (doc) {
         if (doc.usesShopify === true) {
           emit(null, doc.website)
         }
@@ -213,7 +216,7 @@ const shopifyDesignDoc = {
 
 async function createCsv () {
   let _companies = await pouchClient.allDocs({
-    include_docs: true,
+    include_docs: true
   })
   let companies = _companies.rows
   companies = companies.map(company => {
@@ -232,29 +235,28 @@ async function createShopifyCsv () {
   await ensureDesign(shopifyDesignDoc)
   let _shops = await pouchClient.query('shopify/shopify')
   let shops = _shops.rows
-  shops = shops.map(company => {
+  shops = shops.map(shop => {
     return {
       'website': shop.value
     }
   })
-  let companiesCSV = await csv.stringifyAsync(companies, {header: true})
+  let shopsCSV = await csv.stringifyAsync(shops, {header: true})
   let filePath = path.join(__dirname, '..', 'data', 'nyc-shopify-companies.csv')
-  await fs.writeFileAsync(filePath, companiesCSV)
-  return companiesCSV
+  await fs.writeFileAsync(filePath, shopsCSV)
+  return shopsCSV
 }
 
 async function main () {
-  // let NOC = await numberOfCompanies()
-  // let NOP = numberOfPages(NOC)
-  // let count = await pouchClient.info()
-  // await scanPages(NOP)
-  // await scanProfiles()
-  // await scanWebsites()
-  // await createCsv()
-  // await createShopifyCsv()
+  let NOC = await numberOfCompanies()
+  let NOP = numberOfPages(NOC)
+  let count = await pouchClient.info()
+  console.log('count', count)
+  await scanPages(NOP)
+  await scanProfiles()
+  await scanWebsites()
+  await createCsv()
+  await createShopifyCsv()
+  redisClient.quit()
 }
 
-main()
-.then(console.log)
-.catch(err => console.log(err.stack))
-.then(() => redisClient.quit())
+export default main

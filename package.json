@@ -3,6 +3,7 @@
   "main": "src/index.js",
   "esnext": "lib/index.js",
   "scripts": {
+    "test": "standard ./src/*.js",
     "babel-node": "babel ./src --out-dir ./lib",
     "babel-node-watch": "babel ./src --out-dir ./lib --watch",
     "babel-broswerify": "browserify ./src/index.js -o ./lib/index.js -t [ babelify ]",
@@ -12,6 +13,7 @@
   },
   "devDependencies": {
     "babel-cli": "^6.1.2",
+    "babel-eslint": "^4.1.5",
     "babel-plugin-syntax-async-functions": "^6.0.14",
     "babel-plugin-transform-regenerator": "^6.0.18",
     "babel-polyfill": "^6.0.16",
@@ -19,6 +21,7 @@
     "babelify": "^7.2.0",
     "browserify": "^12.0.1",
     "concurrently": "^0.1.1",
+    "standard": "^5.3.1",
     "watchify": "^3.6.0"
   },
   "dependencies": {
@@ -29,6 +32,9 @@
     "pouchdb": "^5.1.0",
     "redis": "^2.3.0",
     "request-promise": "^1.0.2"
+  },
+  "standard": {
+    "parser": "babel-eslint"
   },
   "description": "I'm interested in scraping all of the companies listed in the \"Made in New York\" directory now called `digital.nyc` located here [http://www.digital.nyc/startups](http://www.digital.nyc/startups).",
   "version": "0.0.1",
